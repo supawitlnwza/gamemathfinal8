@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculus Blade: High Score Legend</title>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --hero-color: #00d2ff; --boss-color: #ff4757; --accent: #f1c40f; }
+        body { font-family: 'Chakra Petch', sans-serif; background: #0a0a0c; color: white; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
+        
+        #game-container { width: 100%; max-width: 600px; background: #1e272e; border: 3px solid #485460; border-radius: 25px; overflow: hidden; position: relative; box-shadow: 0 0 100px rgba(0,0,0,0.9); }
+
+        /* Battle Scene */
+        #battle-map { height: 260px; background: linear-gradient(0deg, #2c3e50 0%, #000000 100%); position: relative; display: flex; justify-content: space-around; align-items: flex-end; padding-bottom: 40px; border-bottom: 4px solid #34495e; }
+        
+        /* Hero & Boss Models */
+        .model { width: 100px; height: 130px; position: relative; transition: 0.2s; }
+        .hero-body { width: 60px; height: 100px; background: var(--hero-color); margin: 0 auto; border-radius: 10px; border: 4px solid white; box-shadow: 0 0 20px var(--hero-color); position: relative; }
+        .hero-body::before { content: "⚔️"; position: absolute; right: -30px; top: 20px; font-size: 2rem; transform: rotate(45deg); }
+        
+        .boss-body { width: 80px; height: 110px; background: var(--boss-color); margin: 0 auto; border-radius: 20% 20% 5% 5%; border: 4px solid white; box-shadow: 0 0 30px var(--boss-color); position: relative; }
+        .boss-body::after { content: "🔥"; position: absolute; top: -30px; left: 20px; font-size: 2.5rem; }
+
+        /* HP Systems */
+        .hp-hud { position: absolute; top: 20px; width: 200px; }
+        .hp-bar-bg { width: 100%; height: 15px; background: #000; border: 2px solid #fff; border-radius: 10px; overflow: hidden; }
+        .hp-fill { height: 100%; width: 100%; transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .name-tag { font-size: 0.8rem; font-weight: bold; margin-bottom: 5px; color: #dcdde1; }
+
+        /* Slash & Effects */
+        .slash { position: absolute; width: 150px; height: 10px; background: white; transform: rotate(-45deg); display: none; z-index: 10; border-radius: 50%; box-shadow: 0 0 20px white; }
+
+        /* Animations */
+        @keyframes pounce-right { 0% {left: 0;} 50% {left: 150px; transform: scale(1.3) rotate(10deg);} 100% {left: 0;} }
+        @keyframes pounce-left { 0% {right: 0;} 50% {right: 150px; transform: scale(1.3) rotate(-10deg);} 100% {right: 0;} }
+        @keyframes hit-shake { 0% {transform: translate(5px, 5px);} 20% {transform: translate(-5px, 0);} 40% {transform: translate(5px, -5px);} 100% {transform: translate(0,0); filter: brightness(3);} }
+        .hero-attack { animation: pounce-right 0.4s ease-in; }
+        .boss-attack { animation: pounce-left 0.4s ease-in; }
+        .hit { animation: hit-shake 0.3s; }
+
+        /* Quiz UI */
+        #quiz-part { padding: 25px; }
+        .score-row { display: flex; justify-content: space-between; margin-bottom: 15px; font-weight: bold; color: var(--accent); }
+        .question-box { background: rgba(0,0,0,0.5); padding: 20px; border-radius: 15px; border: 1px solid #57606f; font-size: 1.2rem; text-align: center; margin-bottom: 20px; min-height: 80px; }
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .opt-btn { background: #3d3d3d; color: white; border: 2px solid #57606f; padding: 15px; border-radius: 12px; cursor: pointer; font-family: 'Chakra Petch'; transition: 0.2s; }
+        .opt-btn:hover { background: #4b4b4b; border-color: var(--hero-color); }
+
+        #explain-box { display: none; margin-top: 15px; background: #f1c40f; color: #000; padding: 15px; border-radius: 10px; font-size: 0.9rem; font-weight: bold; }
+        .btn-next { width: 100%; padding: 15px; background: var(--hero-color); border: none; border-radius: 12px; margin-top: 15px; cursor: pointer; font-weight: bold; display: none; }
+
+        #result-screen { display: none; padding: 50px; text-align: center; }
+        .high-score-tag { color: var(--accent); font-size: 1.5rem; margin-top: 10px; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.1);} 100% {transform: scale(1);} }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="play-screen">
+        <div id="battle-map">
+            <div id="slash-fx" class="slash"></div>
+
+            <div class="hp-hud" style="left:20px;">
+                <div class="name-tag">SLAYER (YOU)</div>
+                <div class="hp-bar-bg"><div id="hero-hp" class="hp-fill" style="background: #2ecc71;"></div></div>
+            </div>
+            <div class="hp-hud" style="right:20px; text-align:right;">
+                <div class="name-tag">DERIVATIVE BEAST</div>
+                <div class="hp-bar-bg"><div id="boss-hp" class="hp-fill" style="background: #e74c3c;"></div></div>
+            </div>
+
+            <div id="hero-model" class="model"><div class="hero-body"></div></div>
+            <div id="boss-model" class="model"><div class="boss-body"></div></div>
+        </div>
+
+        <div id="quiz-part">
+            <div class="score-row">
+                <span>🏆 HIGH SCORE: <span id="high-score-val">0</span></span>
+                <span>SCORE: <span id="current-score">0</span></span>
+            </div>
+            <div class="question-box" id="q-text">เตรียมดาบของคุณให้พร้อม...</div>
+            <div class="options-grid" id="opt-grid"></div>
+            <div id="explain-box"></div>
+            <button class="btn-next" id="next-btn" onclick="nextQuestion()">เดินหน้าต่อ ➔</button>
+        </div>
+    </div>
+
+    <div id="result-screen">
+        <h1 id="res-title">การต่อสู้สิ้นสุด</h1>
+        <div style="font-size: 4rem; font-weight: bold;" id="final-score">0</div>
+        <div id="new-record" class="high-score-tag" style="display:none;">NEW RECORD! 🚩</div>
+        <p id="res-msg" style="margin: 20px 0;"></p>
+        <button onclick="location.reload()" style="background:var(--hero-color); border:none; padding:15px 40px; border-radius:30px; cursor:pointer; font-weight:bold; font-size: 1.2rem;">กลับสู่สนามรบ</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        { q: "จงหา f'(x) ของ f(x) = 5x^4 - 3x^2 + 7", a: ["20x^3 - 6x", "20x^4 - 6x", "5x^3 - 3x", "20x^3 - 6"], c: 0, e: "Power Rule: (4*5)x^3 - (2*3)x = 20x^3 - 6x" },
+        { q: "จงหา d/dx [ (2x + 1)^3 ]", a: ["6(2x + 1)^2", "3(2x + 1)^2", "12x", "3(2x)^2"], c: 0, e: "ใช้กฎลูกโซ่: 3(2x+1)^2 * ดิฟไส้(2) = 6(2x+1)^2" },
+        { q: "จงหาอนุพันธ์ของ f(x) = sin(x^2)", a: ["2x cos(x^2)", "cos(x^2)", "-2x cos(x^2)", "2x sin(x)"], c: 0, e: "ดิฟ sin ได้ cos แล้วคูณดิฟไส้ x^2 ได้ 2x" },
+        { q: "จงหา f''(x) ของ f(x) = x^3 + 5x^2", a: ["6x + 10", "3x^2 + 10x", "6x", "10x"], c: 0, e: "ดิฟครั้งที่ 1: 3x^2 + 10x | ดิฟครั้งที่ 2: 6x + 10" },
+        { q: "จงหา d/dx [ ln(x^2) ]", a: ["2/x", "1/x^2", "2x", "2/x^2"], c: 0, e: "1/x^2 * 2x = 2/x" },
+        { q: "จงหา d/dx [ 1/x^3 ]", a: ["-3/x^4", "3/x^2", "-3/x^2", "1/3x^4"], c: 0, e: "x^-3 ดิฟได้ -3x^-4" },
+        { q: "จงหา d/dx [ e^(5x) ]", a: ["5e^(5x)", "e^(5x)", "5x e^(5x)", "25e^(5x)"], c: 0, e: "ดิฟ e^u ได้ e^u * u' จะได้ 5e^5x" },
+        { q: "จงหา f''(x) ของ f(x) = sin(x)", a: ["-sin(x)", "cos(x)", "-cos(x)", "sin(x)"], c: 0, e: "sin -> cos -> -sin" },
+        { q: "จงหาอนุพันธ์ของ f(x) = tan(2x)", a: ["2 sec^2(2x)", "sec^2(2x)", "2 tan(2x)", "2 sec(2x)"], c: 0, e: "ดิฟ tan(u) ได้ sec^2(u) * u'" },
+        { q: "จงหา f'''(x) ของ f(x) = x^4", a: ["24x", "12x^2", "4x^3", "24"], c: 0, e: "4x^3 -> 12x^2 -> 24x" },
+        { q: "จงหาอนุพันธ์ของ f(x) = sqrt(x^2+1)", a: ["x/sqrt(x^2+1)", "2x/sqrt(x^2+1)", "1/2sqrt(x^2+1)", "x"], c: 0, e: "1/2(x^2+1)^-0.5 * 2x" },
+        { q: "จงหา d/dx [ cos(sin x) ]", a: ["-cos x sin(sin x)", "-sin(sin x)", "cos x cos(sin x)", "sin x"], c: 0, e: "ดิฟ cos(u) ได้ -sin(u) * u'" },
+        { q: "จงหา d/dx [ ln(cos x) ]", a: ["-tan x", "tan x", "1/cos x", "sec x"], c: 0, e: "1/cos * (-sin) = -tan x" },
+        { q: "จงหา f'(x) ของ f(x) = 10x^2 - 5x", a: ["20x - 5", "20x", "10x - 5", "5"], c: 0, e: "ดิฟทีละพจน์ตามปกติ" },
+        { q: "จงหา f''(x) ของ f(x) = e^x", a: ["e^x", "2e^x", "x e^x", "0"], c: 0, e: "e^x ดิฟกี่ครั้งก็ได้ตัวเดิม" },
+        { q: "จงหา d/dx [ 1/sqrt(x) ]", a: ["-1/(2x*sqrt(x))", "1/(2*sqrt(x))", "-1/2x", "x^-0.5"], c: 0, e: "x^-0.5 ดิฟได้ -0.5x^-1.5" },
+        { q: "จงหาอนุพันธ์อันดับที่ 4 ของ f(x) = x^3", a: ["0", "6", "6x", "1"], c: 0, e: "ดิฟเกินกำลังจะได้ 0" },
+        { q: "จงหา d/dx [ pi^2 ]", a: ["0", "2pi", "pi", "1"], c: 0, e: "ค่าคงที่ดิฟได้ 0" },
+        { q: "จงหาอนุพันธ์ของ f(x) = sec(x)", a: ["sec x tan x", "sec^2 x", "tan^2 x", "csc x"], c: 0, e: "สูตรมาตรฐาน: sec*tan" },
+        { q: "จงหา d/dx [ 3^x ]", a: ["3^x ln 3", "x*3^x-1", "3^x", "ln 3"], c: 0, e: "a^u -> a^u * ln a" },
+        { q: "จงหา f'(x) ของ f(x) = (x^2+5)^3", a: ["6x(x^2+5)^2", "3(x^2+5)^2", "2x(x^2+5)^2", "6x^2"], c: 0, e: "ดิฟนอกคูณดิฟใน" },
+        { q: "จงหา f''(x) ของ f(x) = ln(x)", a: ["-1/x^2", "1/x", "1/x^2", "-1/x"], c: 0, e: "1/x -> -1/x^2" },
+        { q: "จงหา d/dx [ cot(x) ]", a: ["-csc^2 x", "csc^2 x", "sec^2 x", "tan x"], c: 0, e: "สูตร: -csc^2" },
+        { q: "จงหา f'(x) ของ f(x) = e^-x", a: ["-e^-x", "e^-x", "x e^-x", "-x e^-x"], c: 0, e: "e^-x * (-1)" },
+        { q: "จงหาอนุพันธ์ของ f(x) = log10(x)", a: ["1/(x ln 10)", "1/x", "10/x", "ln 10"], c: 0, e: "1/(x ln 10)" },
+        { q: "จงหา f'''(x) ของ f(x) = e^2x", a: ["8e^2x", "4e^2x", "2e^2x", "16e^2x"], c: 0, e: "2^3 = 8" },
+        { q: "จงหา d/dx [ sin x + cos x ]", a: ["cos x - sin x", "sin x - cos x", "0", "1"], c: 0, e: "ดิฟ sin ได้ cos, cos ได้ -sin" },
+        { q: "จงหา f'(x) ของ f(x) = (4x-5)^100", a: ["400(4x-5)^99", "100(4x-5)^99", "400x^99", "400"], c: 0, e: "100(4x-5)^99 * 4" },
+        { q: "จงหา d/dx [ ln(sin x) ]", a: ["cot x", "tan x", "1/sin x", "cos x"], c: 0, e: "1/sin * cos = cot" },
+        { q: "จงหา f'(x) ของ f(x) = x^x", a: ["x^x(1 + ln x)", "x^x ln x", "x x^x-1", "1 + ln x"], c: 0, e: "Logarithmic Diff." }
+    ];
+
+    let current = 0;
+    let score = 0;
+    let heroHp = 100;
+    let bossHp = 100;
+    let highScore = localStorage.getItem('cal_blade_high') || 0;
+
+    function init() {
+        document.getElementById('high-score-val').innerText = highScore;
+        loadQ();
+    }
+
+    function loadQ() {
+        if(heroHp <= 0 || current >= questions.length) { finish(); return; }
+        
+        const q = questions[current];
+        document.getElementById('q-text').innerText = q.q;
+        document.getElementById('explain-box').style.display = 'none';
+        document.getElementById('next-btn').style.display = 'none';
+        
+        const grid = document.getElementById('opt-grid');
+        grid.innerHTML = '';
+        
+        let opts = q.a.map((v, i) => ({v, i})).sort(() => Math.random() - 0.5);
+        opts.forEach(o => {
+            const b = document.createElement('button');
+            b.className = 'opt-btn';
+            b.innerText = o.v;
+            b.onclick = () => check(o.i, b);
+            grid.appendChild(b);
+        });
+    }
+
+    function check(idx, btn) {
+        const q = questions[current];
+        const btns = document.querySelectorAll('.opt-btn');
+        btns.forEach(b => b.disabled = true);
+
+        if(idx === 0) { // ตอบถูก
+            score += 100;
+            bossHp -= 20;
+            if(bossHp < 0) bossHp = 0;
+            
+            // Animation: Hero Attack
+            document.getElementById('hero-model').classList.add('hero-attack');
+            setTimeout(() => {
+                showSlash();
+                document.getElementById('boss-model').classList.add('hit');
+                document.getElementById('boss-hp').style.width = bossHp + "%";
+            }, 200);
+            
+            setTimeout(() => {
+                document.getElementById('hero-model').classList.remove('hero-attack');
+                document.getElementById('boss-model').classList.remove('hit');
+                if(bossHp <= 0 && current < 29) { // Monster Respawn
+                    bossHp = 100;
+                    document.getElementById('boss-hp').style.width = "100%";
+                }
+            }, 600);
+        } else { // ตอบผิด
+            heroHp -= 10; // โดนได้ 10 รอบ
+            if(heroHp < 0) heroHp = 0;
+
+            // Animation: Boss Attack
+            document.getElementById('boss-model').classList.add('boss-attack');
+            setTimeout(() => {
+                document.getElementById('hero-model').classList.add('hit');
+                document.getElementById('hero-hp').style.width = heroHp + "%";
+            }, 200);
+
+            setTimeout(() => {
+                document.getElementById('boss-model').classList.remove('boss-attack');
+                document.getElementById('hero-model').classList.remove('hit');
+            }, 600);
+            
+            // Highlight Correct
+            btns.forEach(b => { if(b.innerText === q.a[0]) b.style.borderColor = "#2ecc71"; });
+            btn.style.borderColor = "#e74c3c";
+        }
+
+        document.getElementById('current-score').innerText = score;
+        document.getElementById('explain-box').innerHTML = `💡 <b>วิเคราะห์:</b> ${q.e}`;
+        document.getElementById('explain-box').style.display = 'block';
+        document.getElementById('next-btn').style.display = 'block';
+    }
+
+    function showSlash() {
+        const slash = document.getElementById('slash-fx');
+        slash.style.display = 'block';
+        slash.style.left = '300px';
+        slash.style.top = '100px';
+        setTimeout(() => slash.style.display = 'none', 200);
+    }
+
+    function nextQuestion() {
+        current++;
+        loadQ();
+    }
+
+    function finish() {
+        document.getElementById('play-screen').style.display = 'none';
+        document.getElementById('result-screen').style.display = 'block';
+        document.getElementById('final-score').innerText = score;
+
+        if(score > highScore) {
+            localStorage.setItem('cal_blade_high', score);
+            document.getElementById('new-record').style.display = 'block';
+        }
+
+        const msg = document.getElementById('res-msg');
+        if(heroHp > 0) {
+            msg.innerText = "ชัยชนะเป็นของคุณ! คุณได้กวาดล้างปีศาจอนุพันธ์จนสิ้นซาก!";
+        } else {
+            msg.innerText = "คุณพลาดท่าให้กับปีศาจ... แต่อย่ายอมแพ้ ฝึกฝนและกลับมาล้างแค้น!";
+        }
+    }
+
+    init();
+</script>
+</body>
+</html>
